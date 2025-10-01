@@ -1,6 +1,0 @@
-[submodule "firmware/third_party/esp-idf-lib"]
-	path = firmware/third_party/esp-idf-lib
-	url = https://github.com/UncleRus/esp-idf-lib.git
-[submodule "firmware/third_party/core"]
-	path = firmware/third_party/core
-	url = https://github.com/esp-idf-lib/core.git
