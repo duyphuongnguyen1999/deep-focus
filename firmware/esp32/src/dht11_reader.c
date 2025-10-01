@@ -3,7 +3,6 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "dht.h"
-#include "dht11_reader.h"
 
 void read_dht_task(void *pvParameter)
 {
@@ -19,6 +18,6 @@ void read_dht_task(void *pvParameter)
         {
             ESP_LOGW(TAG, "Could not read data from sensor");
         }
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
