@@ -3,16 +3,16 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "dht.h"
+#include "global.h"
 
 void read_dht_task(void *pvParameter)
 {
     ESP_LOGI(TAG, "DHT11 task started on GPIO %d", (int)DHT_GPIO);
     while (1)
     {
-        int16_t temperature, humidity;
-        if (dht_read_data(DHT_TYPE, DHT_GPIO, &humidity, &temperature) == ESP_OK)
+        if (dht_read_data(DHT_TYPE, DHT_GPIO, &global_humidity, &global_temperature) == ESP_OK)
         {
-            ESP_LOGI(TAG, "Humidity: %.1f%%, Temperature: %.1f°C", (float)humidity / 10, (float)temperature / 10);
+            ESP_LOGI(TAG, "Humidity: %.1f%%, Temperature: %.1f°C", (float)global_humidity / 10, (float)global_temperature / 10);
         }
         else
         {
