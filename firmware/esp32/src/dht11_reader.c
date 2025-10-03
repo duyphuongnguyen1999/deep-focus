@@ -5,6 +5,8 @@
 #include "dht.h"
 #include "global.h"
 
+static const char *TAG = "DHT11_READER";
+
 void read_dht_task(void *pvParameter)
 {
     ESP_LOGI(TAG, "DHT11 task started on GPIO %d", (int)DHT_GPIO);
