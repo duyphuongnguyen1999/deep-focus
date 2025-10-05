@@ -62,6 +62,6 @@ void read_dht11_and_update_globals_task(void *pvParameter)
         {
             ESP_LOGW(TAG, "Could not read data from sensor");
         }
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
