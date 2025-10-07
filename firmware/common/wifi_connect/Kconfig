@@ -1,0 +1,15 @@
+menu "Wi-Fi Connection (wifi_conn)"
+    config WIFI_CONN_SSID
+        string "Wi-Fi SSID"
+        default "Duy Phuong (tang 3)"
+
+    config WIFI_CONN_PASSWORD
+        string "Wi-Fi Password"
+        default "Phuong1234"
+        help
+
+    config WIFI_CONN_MAX_RETRY
+        int "Max reconnect retries"
+        range 0 100
+        default 5
+endmenu
