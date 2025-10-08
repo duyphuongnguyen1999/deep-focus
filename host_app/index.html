@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en" xml:lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>UART Realtime</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5"></script>
+  <style>
+    body { margin:0; font-family:system-ui,sans-serif; }
+    header { padding:8px 12px; display:flex; gap:12px; align-items:center; }
+    #chart { width:100vw; height:calc(100vh - 48px); }
+    .ok{color:#0a0}.bad{color:#a00}
+  </style>
+</head>
+<body>
+  <header>
+    <strong>DeepFocus — Offline UART</strong>
+    <span id="status" class="bad">Disconnected</span>
+    <a href="/download" target="_blank">Download CSV</a>
+  </header>
+  <div id="chart"></div>
+  <script>
+    const chart = echarts.init(document.getElementById('chart'));
+    const tData=[], hData=[];
+    chart.setOption({
+      title:{text:'DHT11 Realtime'},
+      tooltip:{trigger:'axis'},
+      legend:{data:['Temp (°C)','Humidity (%)']},
+      xAxis:{type:'time'},
+      yAxis:[{type:'value',name:'°C'},{type:'value',name:'%',min:0,max:100}],
+      series:[
+        {name:'Temp (°C)',type:'line',showSymbol:false,data:tData},
+        {name:'Humidity (%)',type:'line',yAxisIndex:1,showSymbol:false,data:hData}
+      ]
+    });
+    function refresh(){ chart.setOption({series:[{data:tData},{data:hData}]}); }
+    const statusEl=document.getElementById('status');
+    function connect(){
+      const ws=new WebSocket(`ws://${location.host}/ws`);
+      ws.onopen=()=>{statusEl.textContent='Connected';statusEl.className='ok';};
+      ws.onclose=()=>{statusEl.textContent='Disconnected';statusEl.className='bad';setTimeout(connect,1000);};
+      ws.onmessage=(ev)=>{
+        try{
+          const m=JSON.parse(ev.data);
+          const t=new Date(m.ts||Date.now());
+          if(m.temp_c!=null) tData.push([t,m.temp_c]);
+          if(m.humidity!=null) hData.push([t,m.humidity]);
+          if(tData.length>900) tData.shift();
+          if(hData.length>900) hData.shift();
+          refresh();
+        }catch(e){console.error(e);}
+      };
+      setInterval(()=>{try{ws.send('ping')}catch(e){}},20000);
+    }
+    connect();
+  </script>
+</body>
+</html>
