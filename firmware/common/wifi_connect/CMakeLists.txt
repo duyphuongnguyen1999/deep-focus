@@ -1,8 +1,11 @@
 idf_build_get_property(target IDF_TARGET)
 
-file (GLOB SRC_FILES "src/*.c")
+file (GLOB WIFI_SRC_FILES "${CMAKE_CURRENT_LIST_DIR}/src/*.c")
 
-idf_component_register(SRCS ${SRC_FILES}
-                       INCLUDE_DIRS include
-                       REQUIRES esp_wifi esp_netif nvs_flash)
+idf_component_register(
+    SRCS ${WIFI_SRC_FILES}
+    INCLUDE_DIRS 
+        "${CMAKE_CURRENT_LIST_DIR}/include"
+    REQUIRES esp_wifi esp_netif nvs_flash
+)
 
