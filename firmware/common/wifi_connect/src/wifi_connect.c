@@ -1,12 +1,16 @@
+#include <string.h>
 #include "wifi_connect.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
+#include "esp_system.h"
 #include "esp_event.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "esp_netif.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/event_groups.h"
-#include <string.h>
+
+#include "lwip/err.h"
+#include "lwip/sys.h"
 
 static const char *TAG = "wifi_conn";
 
@@ -14,16 +18,21 @@ static const char *TAG = "wifi_conn";
 #define CONFIG_WIFI_CONN_MAX_RETRY 5
 #endif
 
+/* FreeRTOS event group to signal when we are connected*/
+static EventGroupHandle_t s_wifi_event_group;
+
 /* Event bits */
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT BIT1
 
-static EventGroupHandle_t s_wifi_event_group;
+/* Static variables */
 static int s_retry_num = 0;
+static int s_max_retry_cfg = CONFIG_WIFI_CONN_MAX_RETRY;
 static wifi_conn_state_t s_state = WIFI_CONN_STATE_IDLE;
 static esp_netif_t *s_netif = NULL;
+
+/* Wi-Fi Configuration struct */
 static wifi_config_t s_wifi_cfg = {0};
-static int s_max_retry_cfg = CONFIG_WIFI_CONN_MAX_RETRY;
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
@@ -55,7 +64,15 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         s_retry_num = 0;
         s_state = WIFI_CONN_STATE_GOT_IP;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-        ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&e->ip_info.ip));
+        ESP_LOGI(TAG, "Got IPv4: " IPSTR, IP2STR(&e->ip_info.ip));
+    }
+    else if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6)
+    {
+        ip_event_got_ip6_t *e = (ip_event_got_ip_t *)event_data;
+        s_retry_num = 0;
+        s_state = WIFI_CONN_STATE_GOT_IP;
+        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        ESP_LOGI(TAG, "Got IPv6: " IPV6STR, IPV6STR(&e->ip_info.ip));
     }
 }
 
@@ -72,8 +89,12 @@ static esp_err_t ensure_nvs_init(void)
 
 esp_err_t wifi_conn_init(const wifi_conn_config_t *cfg)
 {
-    ESP_ERROR_CHECK(ensure_nvs_init());
+    s_wifi_event_group = xEventGroupCreate();
+
+    /* Initilize Netif and NVS */
     ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(ensure_nvs_init());
+
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     if (!s_netif)
@@ -81,18 +102,25 @@ esp_err_t wifi_conn_init(const wifi_conn_config_t *cfg)
         s_netif = esp_netif_create_default_wifi_sta();
     }
 
+    /* Initialize Wi-Fi */
     wifi_init_config_t wicfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&wicfg));
+
+    /* Event instances register */
+    esp_event_handler_instance_t instance_any_id;
+    esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                                                         ESP_EVENT_ANY_ID,
-                                                        &wifi_event_handler, NULL, NULL));
+                                                        &wifi_event_handler,
+                                                        NULL,
+                                                        &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
                                                         IP_EVENT_STA_GOT_IP,
-                                                        &wifi_event_handler, NULL, NULL));
+                                                        &wifi_event_handler,
+                                                        NULL,
+                                                        &instance_got_ip));
 
-    s_wifi_event_group = xEventGroupCreate();
-
-    /* chọn SSID/PASS */
+    /* Select SSID/PASS */
     const char *ssid = (cfg && cfg->ssid) ? cfg->ssid : CONFIG_WIFI_CONN_SSID;
     const char *pass = (cfg && cfg->password) ? cfg->password : CONFIG_WIFI_CONN_PASSWORD;
     s_max_retry_cfg = (cfg && cfg->max_retry >= 0) ? cfg->max_retry : CONFIG_WIFI_CONN_MAX_RETRY;
@@ -101,6 +129,10 @@ esp_err_t wifi_conn_init(const wifi_conn_config_t *cfg)
     strncpy((char *)s_wifi_cfg.sta.ssid, ssid, sizeof(s_wifi_cfg.sta.ssid) - 1);
     strncpy((char *)s_wifi_cfg.sta.password, pass, sizeof(s_wifi_cfg.sta.password) - 1);
 
+    /* Select Authmode
+     * If password is empty --> WIFI_AUTH_OPEN
+     * Else -->  WIFI_AUTH_WPA2_PSK
+     */
     s_wifi_cfg.sta.threshold.authmode = (strlen(pass) == 0) ? WIFI_AUTH_OPEN : WIFI_AUTH_WPA2_PSK;
     s_wifi_cfg.sta.pmf_cfg.capable = true;
     s_wifi_cfg.sta.pmf_cfg.required = false;
@@ -120,10 +152,11 @@ esp_err_t wifi_conn_init(const wifi_conn_config_t *cfg)
 
 esp_err_t wifi_conn_start(void)
 {
+    // Ensure that Wi-Fi EvenGroup had been initialized
     if (!s_wifi_event_group)
         return ESP_ERR_INVALID_STATE;
     ESP_ERROR_CHECK(esp_wifi_start());
-    // WIFI_EVENT_STA_START sẽ gọi esp_wifi_connect() trong handler
+    // WIFI_EVENT_STA_START will call esp_wifi_connect() in handler
     return ESP_OK;
 }
 
