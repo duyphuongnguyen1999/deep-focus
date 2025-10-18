@@ -1,0 +1,33 @@
+menu "Wi-Fi Access Point Configuration"
+    config WIFI_CONFIG_AP_SSID
+        string "Access Point SSID"
+        default "DeepFocus Access Point"
+
+    config WIFI_CONFIG_AP_PASSWORD
+        string "Access Point Password"
+        default ""
+        help
+          Set the password for the Wi-Fi Access Point. Must be at least 8 characters long.
+
+    config WIFI_CONFIG_AP_CHANNEL
+        int "Access Point Channel"
+        range 1 11
+        default 1
+        help
+          Set the Wi-Fi channel for the Access Point (1-11).
+
+    config WIFI_CONFIG_AP_MAX_CONNECTIONS
+        int "Max Connections"
+        range 1 10
+        default 4
+        help
+          Set the maximum number of devices that can connect to the Access Point simultaneously.
+          
+    config WIFI_CONFIG_AP_MAX_RETRY
+        int "Max Connection Retry"
+        range 0 20
+        default 5
+        help
+          Set the maximum number of connection retries for the Access Point.
+
+endmenu
