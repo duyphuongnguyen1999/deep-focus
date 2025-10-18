@@ -26,7 +26,7 @@
       tooltip:{trigger:'axis'},
       legend:{data:['Temp (°C)','Humidity (%)']},
       xAxis:{type:'time'},
-      yAxis:[{type:'value',name:'°C'},{type:'value',name:'%',min:0,max:100}],
+      yAxis:[{type:'value',name:'°C',min:0,max:50},{type:'value',name:'%',min:0,max:100}],
       series:[
         {name:'Temp (°C)',type:'line',showSymbol:false,data:tData},
         {name:'Humidity (%)',type:'line',yAxisIndex:1,showSymbol:false,data:hData}
