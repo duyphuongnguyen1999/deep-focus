@@ -16,6 +16,7 @@
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
+#include "lwip/ip4_addr.h"
 
 static const char *TAG = "wifi_config_ap";
 
@@ -90,6 +91,84 @@ static esp_err_t ensure_nvs_init(void)
     return ret;
 }
 
+static esp_err_t dhcp_server_configure(esp_netif_t *netif)
+{
+    if (!netif)
+        return ESP_ERR_INVALID_ARG;
+
+    esp_err_t err = esp_netif_dhcps_stop(netif);
+    if (err != ESP_OK && err != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STOPPED)
+    {
+        ESP_LOGE(TAG, "Failed to stop DHCP server: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // Configure static IP for the AP
+    esp_netif_ip_info_t ip_info = {};
+    IP4_ADDR(&ip_info.ip, 192, 168, 4, 1);
+    IP4_ADDR(&ip_info.gw, 192, 168, 4, 1);
+    IP4_ADDR(&ip_info.netmask, 255, 255, 255, 0);
+
+    err = esp_netif_set_ip_info(netif, &ip_info);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to set IP info: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    /**  Set DNS server to the AP IP **/
+#if ESP_IDF_VERSION_MAJOR >= 4
+    esp_netif_dns_info_t dns = {0};
+    dns.ip.u_addr.ip4 = ip_info.gw; // main DNS = 192.168.4.1
+    dns.ip.type = ESP_IPADDR_TYPE_V4;
+    esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns);
+#endif
+    ESP_LOGI(TAG, "DHCP server configured: IP=" IPSTR " GW=" IPSTR " MASK=" IPSTR,
+             IP2STR(&ip_info.ip), IP2STR(&ip_info.gw), IP2STR(&ip_info.netmask));
+    return ESP_OK;
+}
+
+static esp_err_t dhcp_server_start(esp_netif_t *netif)
+{
+    if (!netif)
+        return ESP_ERR_INVALID_ARG;
+
+    esp_err_t err = esp_netif_dhcps_start(netif);
+    if (err == ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED)
+    {
+        ESP_LOGW(TAG, "DHCP server already started");
+        return ESP_OK;
+    }
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to start DHCP server: %s", esp_err_to_name(err));
+        return err;
+    }
+    ESP_LOGI(TAG, "DHCP server started on netif");
+    return ESP_OK;
+}
+
+static esp_err_t dhcp_server_stop(esp_netif_t *netif)
+{
+    if (!netif)
+        return ESP_ERR_INVALID_ARG;
+    esp_err_t err = esp_netif_dhcps_stop(netif);
+    if (err == ESP_ERR_ESP_NETIF_DHCP_ALREADY_STOPPED)
+    {
+        ESP_LOGW(TAG, "DHCP server already stopped");
+        return ESP_OK;
+    }
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to stop DHCP server: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG, "DHCP server stopped on netif");
+    return ESP_OK;
+}
+
+/*========== Public Functions ==========*/
 esp_err_t wifi_config_ap_init(wifi_config_ap_settings_t *settings)
 {
     s_wifi_event_group = xEventGroupCreate();
@@ -97,17 +176,17 @@ esp_err_t wifi_config_ap_init(wifi_config_ap_settings_t *settings)
         return ESP_ERR_NO_MEM;
 
     /* Initilize Netif and NVS */
-    esp_err_t netif_err = esp_netif_init();
-    if (netif_err != ESP_OK)
-        return netif_err;
+    esp_err_t err = esp_netif_init();
+    if (err != ESP_OK)
+        return err;
 
-    esp_err_t nvs_err = ensure_nvs_init();
-    if (nvs_err != ESP_OK)
-        return nvs_err;
+    err = ensure_nvs_init();
+    if (err != ESP_OK)
+        return err;
 
-    esp_err_t evt_loop_err = esp_event_loop_create_default();
-    if (evt_loop_err != ESP_OK && evt_loop_err != ESP_ERR_INVALID_STATE)
-        return evt_loop_err;
+    err = esp_event_loop_create_default();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE)
+        return err;
 
     if (!s_netif)
     {
@@ -116,9 +195,9 @@ esp_err_t wifi_config_ap_init(wifi_config_ap_settings_t *settings)
 
     /* Initialize Wi-Fi */
     wifi_init_config_t wicfg = WIFI_INIT_CONFIG_DEFAULT();
-    esp_err_t wifi_init_err = esp_wifi_init(&wicfg);
-    if (wifi_init_err != ESP_OK)
-        return wifi_init_err;
+    err = esp_wifi_init(&wicfg);
+    if (err != ESP_OK)
+        return err;
 
     /* Event instances register */
     esp_event_handler_instance_t instance_any_id;
@@ -172,6 +251,18 @@ esp_err_t wifi_config_ap_init(wifi_config_ap_settings_t *settings)
     ESP_LOGI(TAG, "Wifi_init_softap finished. SSID:%s password:%s channel:%d",
              s_ap_ssid, s_ap_password, s_ap_channel);
 
+    /* Configure and start DHCP server */
+    err = dhcp_server_configure(s_netif);
+    if (err != ESP_OK)
+    {
+        return err;
+    }
+    err = dhcp_server_start(s_netif);
+    if (err != ESP_OK)
+    {
+        return err;
+    }
+    /* Auto start if configured */
     if (settings && settings->auto_start)
     {
         return wifi_config_ap_start();
