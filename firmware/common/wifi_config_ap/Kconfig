@@ -22,12 +22,5 @@ menu "Wi-Fi Access Point Configuration"
         default 4
         help
           Set the maximum number of devices that can connect to the Access Point simultaneously.
-          
-    config WIFI_CONFIG_AP_MAX_RETRY
-        int "Max Connection Retry"
-        range 0 20
-        default 5
-        help
-          Set the maximum number of connection retries for the Access Point.
 
 endmenu
