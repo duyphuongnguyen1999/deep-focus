@@ -1,0 +1,93 @@
+# ✅ TODO TREE — ESP32 Firmware
+
+# ────────────────────────────────────────────────
+# 1️⃣ NVS STORAGE
+# ────────────────────────────────────────────────
+- [x] TODO [core] Init NVS trong `app_main() or app_runtime_init()`
+- [x] TODO [nvs] Viết `nvs_wifi_get(ssid, pass)` và `nvs_wifi_set(ssid, pass)`
+- [ ] TODO [nvs] Unit test: set → get → compare
+
+# ────────────────────────────────────────────────
+# 2️⃣ WIFI_CONNECT (STA mode)
+# ────────────────────────────────────────────────
+- [x] TODO [api] Thêm hàm `wifi_conn_set_ssid_password(const char* ssid, const char* pass)`
+- [x] TODO [api] Thêm chức năng wifi_connect_start_from_nvs
+- [x] TODO [event] Đăng ký event handler cho `WIFI_EVENT` và `IP_EVENT`
+- [ ] TODO [retry] Thêm cơ chế retry + backoff khi connect thất bại
+- [ ] TODO [log] In SSID (ẩn password) + RSSI khi connect thành công
+- [ ] TODO [test] Test SSID sai / router off/on
+- [ ] TODO [pmf] Thêm option bật/tắt PMF/WPA3 qua `Kconfig`
+
+# ────────────────────────────────────────────────
+# 3️⃣ WIFI_CONFIG_AP (SoftAP + Web Server cấu hình Wi-Fi)
+# ────────────────────────────────────────────────
+- [x] TODO [api] Viết `wifi_config_ap_start()` và `wifi_config_ap_stop()`
+- [x] TODO [ap] Tạo SoftAP: SSID `ESP_Config_AP`, pass `12345678`, channel cố định
+- [x] TODO [ip] Cấu hình DHCP server (IP 192.168.4.1)
+- [x] TODO [http] Khởi tạo `esp_http_server`
+  - [x] TODO [route] `GET /` trả về form HTML nhập SSID/PASS
+  - [x] TODO [route] `POST /save` nhận form, parse `ssid`, `pass`
+  - [x] TODO [nvs] Lưu thông tin vào NVS
+  - [x] TODO [flow] Trả “Saved, rebooting…” rồi gọi `esp_restart()`
+- [ ] TODO [timeout] Tự tắt AP sau 5 phút nếu không có client
+- [ ] TODO [test] Kết nối từ điện thoại → mở `192.168.4.1` → nhập Wi-Fi → kiểm tra lưu thành công
+
+# ────────────────────────────────────────────────
+# 4️⃣ APP FLOW (chuyển giữa AP và STA)
+# ────────────────────────────────────────────────
+- [x] TODO [flow] Trong `app_runtime_init()`:
+  - [x] Nếu có SSID/PASS trong NVS → `wifi_connect_start_from_nvs()`
+  - [x] Nếu không có → `wifi_connect_start_from_menuconfig()`
+  - [x] Nếu không có → `wifi_config_ap_start()`
+- [ ] TODO [fallback] STA fail N lần → bật lại `wifi_config_ap_start()`
+- [ ] TODO [ui] OLED hiển thị “AP MODE / CONNECTING / CONNECTED IP: x.x.x.x”
+
+# ────────────────────────────────────────────────
+# 5️⃣ OLED DISPLAY
+# ────────────────────────────────────────────────
+- [ ] TODO [ui] Viết `oled_show_status(const char* line1, const char* line2)`
+- [ ] TODO [bind] Cập nhật từ event Wi-Fi/IP
+- [ ] TODO [test] Hiển thị đúng trạng thái AP/STA/DHT11
+
+# ────────────────────────────────────────────────
+# 6️⃣ DHT11 SENSOR
+# ────────────────────────────────────────────────
+- [x] TODO [read] Task đọc sensor mỗi 2–5s
+- [x] TODO [update] Cập nhật dữ liệu lên OLED
+- [ ] TODO [sync] Gửi dữ liệu cho Web server (nếu đang ở AP mode)
+
+# ────────────────────────────────────────────────
+# 7️⃣ CONFIG & BUILD SYSTEM
+# ────────────────────────────────────────────────
+- [x] TODO [kconfig] Thêm `Kconfig` cho:
+  - [x] AP SSID/PASS mặc định
+  - [x] AP Channel
+  - [x] STA retry count
+  - [ ] Enable PMF/WPA3
+- [x] TODO [cmake] Cấu hình dependencies:
+  - [x] `wifi_connect`: `esp_wifi`, `esp_event`, `nvs_flash`
+  - [x] `wifi_config_ap`: `esp_wifi`, `esp_event`, `esp_http_server`, `nvs_flash`
+  - [x] `i2c_oled_display`: `esp_lcd`, `lvgl`
+
+# ────────────────────────────────────────────────
+# 8️⃣ SECURITY & STABILITY
+# ────────────────────────────────────────────────
+- [ ] TODO [secure] Ẩn password trong log
+- [ ] TODO [timeout] Tự tắt AP nếu không cấu hình sau X phút
+- [ ] TODO [watchdog] Kiểm tra WDT của LVGL/HTTP task
+- [ ] TODO [mem] Kiểm tra malloc fail → xử lý graceful
+
+# ────────────────────────────────────────────────
+# 9️⃣ TEST CASES
+# ────────────────────────────────────────────────
+- [ ] TEST Config Wi-Fi thành công → reboot → tự kết nối
+- [ ] TEST Nhập sai password → STA fail → bật lại AP
+- [ ] TEST Xóa NVS (factory reset) → bật AP
+- [ ] TEST Nhiễu Wi-Fi → đổi channel AP
+- [ ] TEST OLED hiển thị đúng trong mọi trạng thái
+
+# ────────────────────────────────────────────────
+# 🔟 EXTENSION (tùy chọn)
+# ────────────────────────────────────────────────
+- [ ] TODO [api] Thêm route `GET /status.json` trả JSON `{temp, hum, wifi_state}`
+- [ ] TODO [future] Thêm MQTT client sau khi Wi-Fi ổn định
