@@ -35,16 +35,24 @@ static EventGroupHandle_t s_wifi_event_group;
 static wifi_config_ap_state_t s_state = WIFI_CONFIG_AP_STATE_IDLE;
 static esp_netif_t *s_netif = NULL;
 
-/* Static variables */
-static const char *s_ap_ssid = NULL;
-static const char *s_ap_password = NULL;
+/* Default config */
+#ifndef CONFIG_WIFI_CONFIG_AP_SSID
+#define CONFIG_WIFI_CONFIG_AP_SSID "ESP32-Setup"
+#endif
+#ifndef CONFIG_WIFI_CONFIG_AP_PASSWORD
+#define CONFIG_WIFI_CONFIG_AP_PASSWORD ""
+#endif
 #ifndef CONFIG_WIFI_CONFIG_AP_CHANNEL
 #define CONFIG_WIFI_CONFIG_AP_CHANNEL 1
 #endif
-static int s_ap_channel = CONFIG_WIFI_CONFIG_AP_CHANNEL;
 #ifndef CONFIG_WIFI_CONFIG_AP_MAX_CONNECTIONS
 #define CONFIG_WIFI_CONFIG_AP_MAX_CONNECTIONS 4
 #endif
+
+/* Static AP Settings */
+static const char *s_ap_ssid = NULL;
+static const char *s_ap_password = NULL;
+static int s_ap_channel = CONFIG_WIFI_CONFIG_AP_CHANNEL;
 static int s_ap_max_connections = CONFIG_WIFI_CONFIG_AP_MAX_CONNECTIONS;
 
 /* Wi-Fi Configuration struct */
@@ -290,4 +298,14 @@ esp_err_t wifi_config_ap_stop(void)
         return stop_err;
     // WIFI_EVENT_AP_STOP will be handled in event handler
     return ESP_OK;
+}
+
+wifi_config_ap_state_t wifi_config_ap_get_state(void)
+{
+    return s_state;
+}
+
+esp_netif_t *wifi_config_ap_get_netif(void)
+{
+    return s_netif;
 }

@@ -24,9 +24,20 @@ extern "C"
         bool auto_start;
     } wifi_config_ap_settings_t;
 
+    /** Initialize Wi-Fi in Access Point mode with given settings **/
     esp_err_t wifi_config_ap_init(wifi_config_ap_settings_t *settings);
+
+    /** Start the Wi-Fi Access Point **/
     esp_err_t wifi_config_ap_start(void);
+
+    /** Stop the Wi-Fi Access Point **/
     esp_err_t wifi_config_ap_stop(void);
+
+    /** Get current Wi-Fi Access Point state **/
+    wifi_config_ap_state_t wifi_config_ap_get_state(void);
+
+    /** Get current netif */
+    esp_netif_t *wifi_config_ap_get_netif(void);
 
 #ifdef __cplusplus
 }
