@@ -2,6 +2,7 @@
 #include "esp_err.h"
 #include "esp_netif_ip_addr.h"
 #include <stdbool.h>
+#include "esp_wifi.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -27,6 +28,15 @@ extern "C"
 
     /** Initialize Wi-Fi STA (esp_netif, nvs, wifi driver). */
     esp_err_t wifi_conn_init(const wifi_conn_config_t *cfg);
+
+    /** Set Wi-Fi Configuration **/
+    esp_err_t wifi_conn_set_wifi_config(const wifi_config_t *wifi_cfg);
+
+    /** Set SSID and Password **/
+    esp_err_t wifi_conn_set_ssid_password(const char *ssid, const char *password);
+
+    /** Get current Wi-Fi Configuration **/
+    const wifi_config_t *wifi_conn_get_wifi_config(void);
 
     /** Start Wi-fi connnection (if haven't start, auto_start = false). */
     esp_err_t wifi_conn_start(void);
