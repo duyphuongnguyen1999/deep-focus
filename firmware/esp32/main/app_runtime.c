@@ -1,6 +1,10 @@
 #include <stdio.h>
+#include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
+
 #include "esp_log.h"
 #include "esp_check.h"
 #include "lwip/inet.h"
@@ -8,12 +12,100 @@
 #include "app_config.h"
 #include "app_runtime.h"
 
-#include "wifi_connect.h"
+#include "wifi_connect.h"   // STA module
+#include "wifi_config_ap.h" // AP + DHCP module
+#include "wifi_prov_http.h" // HTTP form /save
+#include "wifi_nvs.h"       // NVS creds
+
 #include "dht11_reader.h"
 #include "i2c_oled_display.h"
 #include "global.h"
 
 static const char *TAG = "APP_RUNTIME";
+
+/*========== Pipeline event group ==========*/
+static EventGroupHandle_t s_runtime_eg = NULL;
+#define EV_SAVED_BIT BIT0 // nhận khi HTTP /save đã lưu NVS
+
+/*========== HTTP saved callback ==========*/
+static void on_prov_saved(const char *ssid, const char *pass, void *ctx)
+{
+    (void)ssid;
+    (void)pass;
+    (void)ctx;
+    if (s_runtime_eg)
+        xEventGroupSetBits(s_runtime_eg, EV_SAVED_BIT);
+}
+
+/*========== Helper: Try to connect STA by creds in NVS ==========*/
+static bool try_sta_from_nvs(int wait_ip_timeout_ms)
+{
+    char ssid[33], pass[65];
+    if (wifi_nvs_get_creds(ssid, sizeof(ssid), pass, sizeof(pass)) != ESP_OK)
+    {
+        ESP_LOGW(TAG, "No Wi-Fi creds in NVS");
+        return false;
+    }
+
+    wifi_conn_config_t cfg = {
+        .ssid = ssid,
+        .password = pass,
+        .max_retry = CONFIG_WIFI_CONN_MAX_RETRY, // or -1
+        .auto_start = true,
+    };
+    esp_err_t e = wifi_conn_init(&cfg);
+    if (e != ESP_OK && e != ESP_ERR_INVALID_STATE)
+    {
+        ESP_LOGE(TAG, "wifi_conn_init failed: %s", esp_err_to_name(e));
+        return false;
+    }
+
+    e = wifi_conn_wait_ip(wait_ip_timeout_ms);
+    if (e == ESP_OK)
+    {
+        uint32_t ip;
+        if (wifi_conn_get_ipv4(&ip))
+        {
+            struct in_addr a = {.s_addr = ip};
+            ESP_LOGI(TAG, "STA ready (NVS), IP: %s", inet_ntoa(a));
+        }
+        else
+        {
+            ESP_LOGI(TAG, "STA ready (NVS), IP obtained");
+        }
+        return true;
+    }
+
+    ESP_LOGW(TAG, "STA connect failed/timeout (NVS)");
+    (void)wifi_conn_stop();
+    return false;
+}
+
+/*========== Helper: Start AP + HTTP provisioning ==========*/
+static esp_err_t start_ap_and_http(const char *ap_ssid, const char *ap_pass, int ch, int max_conn)
+{
+    wifi_config_ap_settings_t ap = {
+        .ssid = ap_ssid,
+        .password = ap_pass,
+        .channel = ch,
+        .max_connections = max_conn,
+        .auto_start = true,
+    };
+
+    ESP_RETURN_ON_ERROR(wifi_config_ap_init(&ap), TAG, "AP init failed");
+    wifi_prov_http_register_save_handler(on_prov_saved, NULL);
+    ESP_RETURN_ON_ERROR(wifi_prov_http_init(), TAG, "HTTP start failed");
+
+    ESP_LOGI(TAG, "AP up SSID:%s (pass:%s), browse http://192.168.4.1/", ap_ssid, ap_pass);
+    return ESP_OK;
+}
+
+/*========== Helper: Stop AP + HTTP ==========*/
+static void stop_ap_and_http(void)
+{
+    wifi_prov_http_deinit();
+    (void)wifi_config_ap_stop();
+}
 
 /*========== LVGL ========== */
 // Handle display for "update_task"
@@ -35,38 +127,84 @@ static void updater_task(void *arg)
     }
 }
 
-/*========== Wi-fi Connection ========== */
+/*========== Wi-fi Orchestration ========== */
 static esp_err_t start_wifi(void)
 {
-    wifi_conn_config_t wifi_cfg = {
-        .ssid = NULL, // Use menuconfig configuration
-        .password = NULL,
-        .max_retry = -1, // Use CONFIG_WIFI_CONN_MAX_RETRY
-        .auto_start = true,
-    };
-
-    ESP_RETURN_ON_ERROR(wifi_conn_init(&wifi_cfg), TAG, "wifi_conn_init failed");
-
-    if (wifi_conn_wait_ip(15000) == ESP_OK)
+    // 1. Create event group
+    if (!s_runtime_eg)
     {
-        uint32_t ip;
-        if (wifi_conn_get_ipv4(&ip))
+        s_runtime_eg = xEventGroupCreate();
+        if (!s_runtime_eg)
         {
-            struct in_addr a = {.s_addr = ip};
-            ESP_LOGI(TAG, "Wi-Fi ready, IP: %s", inet_ntoa(a));
-        }
-        else
-        {
-            ESP_LOGW(TAG, "Got IP but wifi_conn_get_ipv4() failed");
+            ESP_LOGE(TAG, "Create event group failed");
+            return ESP_ERR_NO_MEM;
         }
     }
-    else
+
+    // 2. Try connect STA from NVS
+    if (try_sta_from_nvs(/*wait_ip_timeout_ms=*/15000))
     {
-        ESP_LOGE(TAG, "Wi-Fi connect failed or timeout");
-        // Not return ESP_FAIl so that the program could run offline mode
-        // return ESP_FAIL;
+        return ESP_OK; // connected ok
     }
-    return ESP_OK;
+
+    // 3. Connect failed, start AP + HTTP provisioning -> try config from menuconfig
+    {
+        wifi_conn_config_t wifi_cfg = {
+            .ssid = NULL, // Use menuconfig configuration
+            .password = NULL,
+            .max_retry = -1, // Use CONFIG_WIFI_CONN_MAX_RETRY
+            .auto_start = true,
+        };
+
+        if (wifi_conn_init(&wifi_cfg) == ESP_OK && wifi_conn_wait_ip(15000) == ESP_OK)
+        {
+            uint32_t ip;
+            if (wifi_conn_get_ipv4(&ip))
+            {
+                struct in_addr a = {.s_addr = ip};
+                ESP_LOGI(TAG, "Wi-Fi ready (menuconfig), IP: %s", inet_ntoa(a));
+            }
+            return ESP_OK; // connected ok
+        }
+        (void)wifi_conn_stop();
+        ESP_LOGW(TAG, "STA (Kconfig) failed; fallback to provisioning AP.");
+    }
+
+    // 4. Start AP + HTTP provisioning
+    ESP_RETURN_ON_ERROR(
+        start_ap_and_http(
+            CONFIG_WIFI_CONFIG_AP_SSID,
+            CONFIG_WIFI_CONFIG_AP_PASSWORD,
+            CONFIG_WIFI_CONFIG_AP_CHANNEL,
+            CONFIG_WIFI_CONFIG_AP_MAX_CONNECTIONS),
+        TAG,
+        "start_ap_and_http failed");
+
+    // 5. Wait for HTTP /save event
+    EventBits_t bits = xEventGroupWaitBits(
+        s_runtime_eg,
+        EV_SAVED_BIT,
+        pdTRUE,
+        pdFALSE,
+        portMAX_DELAY);
+
+    // 6. Stop AP + HTTP provisioning and try connect STA again
+    stop_ap_and_http();
+
+    if (!(bits & EV_SAVED_BIT))
+    {
+        ESP_LOGW(TAG, "Provisioning timeout. Offline mode.");
+        return ESP_ERR_TIMEOUT;
+    }
+
+    // 7. Try connect STA from NVS again
+    if (try_sta_from_nvs(15000))
+    {
+        return ESP_OK;
+    }
+
+    ESP_LOGE(TAG, "Provisioning done but STA connect failed.");
+    return ESP_FAIL;
 }
 
 /*========== Read DHT11 Data ==========*/

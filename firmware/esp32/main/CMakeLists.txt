@@ -5,14 +5,12 @@ idf_component_register(
     INCLUDE_DIRS 
         include
     REQUIRES 
-        esp_lcd 
-        esp_driver_i2c 
-        esp_timer 
-        lvgl 
-        esp_netif
         global
-        wifi_connect
         dht_reader
         i2c_oled
         uart_bridge
+        wifi_connect
+        wifi_config_ap
+        wifi_prov_http
+        wifi_nvs
 )
