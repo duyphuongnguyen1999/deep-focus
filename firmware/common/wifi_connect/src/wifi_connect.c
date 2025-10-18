@@ -14,10 +14,6 @@
 
 static const char *TAG = "wifi_conn";
 
-#ifndef CONFIG_WIFI_CONN_MAX_RETRY
-#define CONFIG_WIFI_CONN_MAX_RETRY 5
-#endif
-
 /*========== FreeRTOS event group to signal when we are connected ==========*/
 static EventGroupHandle_t s_wifi_event_group;
 
@@ -146,7 +142,7 @@ esp_err_t wifi_conn_init(const wifi_conn_config_t *cfg)
     }
     else
     {
-        s_wifi_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_WPA3_PSK;
+        s_wifi_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
         s_wifi_cfg.sta.pmf_cfg.capable = true;
         s_wifi_cfg.sta.pmf_cfg.required = false;
     }
@@ -219,7 +215,7 @@ esp_err_t wifi_conn_set_ssid_password(const char *ssid, const char *password)
     }
     else
     {
-        s_wifi_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_WPA3_PSK;
+        s_wifi_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
         s_wifi_cfg.sta.pmf_cfg.capable = true;
         s_wifi_cfg.sta.pmf_cfg.required = false;
     }

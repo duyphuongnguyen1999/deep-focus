@@ -4,6 +4,10 @@
 #include <stdbool.h>
 #include "esp_wifi.h"
 
+#ifndef CONFIG_WIFI_CONN_MAX_RETRY
+#define CONFIG_WIFI_CONN_MAX_RETRY 5
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {

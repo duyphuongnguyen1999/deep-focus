@@ -29,7 +29,7 @@ extern "C"
      *
      * @return esp_err_t ESP_OK on success, error code otherwise
      */
-    esp_err_t wifi_nvs_get(char *ssid, size_t ssid_size, char *password, size_t password_size);
+    esp_err_t wifi_nvs_get_creds(char *ssid, size_t ssid_size, char *password, size_t password_size);
 
     /**
      * @brief Set Wi-Fi SSID and password to NVS
@@ -39,7 +39,7 @@ extern "C"
      *
      * @return esp_err_t ESP_OK on success, error code otherwise
      */
-    esp_err_t wifi_nvs_set(const char *ssid, const char *password);
+    esp_err_t wifi_nvs_set_creds(const char *ssid, const char *password);
 
     /**
      * @brief Clear Wi-Fi SSID and password from NVS

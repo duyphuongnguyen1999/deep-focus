@@ -247,7 +247,7 @@ esp_err_t wifi_config_ap_init(wifi_config_ap_settings_t *settings)
     }
     else
     {
-        s_wifi_ap_cfg.ap.authmode = WIFI_AUTH_WPA2_WPA3_PSK;
+        s_wifi_ap_cfg.ap.authmode = WIFI_AUTH_WPA2_PSK;
         s_wifi_ap_cfg.ap.pmf_cfg.capable = true;
         s_wifi_ap_cfg.ap.pmf_cfg.required = false;
     }

@@ -38,7 +38,7 @@ static inline bool credential_valid(const char *ssid, const char *pass)
 }
 
 /** Get Wi-Fi SSID and password from NVS */
-esp_err_t wifi_nvs_get(char *ssid, size_t ssid_size, char *password, size_t password_size)
+esp_err_t wifi_nvs_get_creds(char *ssid, size_t ssid_size, char *password, size_t password_size)
 {
     esp_err_t err;
     nvs_handle_t nvs_handle;
@@ -78,7 +78,7 @@ esp_err_t wifi_nvs_get(char *ssid, size_t ssid_size, char *password, size_t pass
     else if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "Get PASS failed: %s", esp_err_to_name(err));
-        nvs_close(h);
+        nvs_close(nvs_handle);
         return err;
     }
 
@@ -94,7 +94,7 @@ esp_err_t wifi_nvs_get(char *ssid, size_t ssid_size, char *password, size_t pass
     return ESP_OK;
 }
 
-esp_err_t wifi_nvs_set(const char *ssid, const char *password)
+esp_err_t wifi_nvs_set_creds(const char *ssid, const char *password)
 {
     esp_err_t err;
     nvs_handle_t nvs_handle;

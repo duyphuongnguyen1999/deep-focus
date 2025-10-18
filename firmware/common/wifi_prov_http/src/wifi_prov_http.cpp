@@ -187,7 +187,7 @@ static esp_err_t save_post_handler(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid ssid/pass length");
     }
 
-    esp_err_t e = wifi_nvs_set(ssid, pass);
+    esp_err_t e = wifi_nvs_set_creds(ssid, pass);
     if (e != ESP_OK)
     {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "NVS save failed");
@@ -205,8 +205,8 @@ static esp_err_t save_post_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_send(req, ok, sizeof(ok) - 1);
 
-    /* Gọi callback (nếu có) sau khi đã gửi response */
-    deferred_log_and_cb(ssid, pass);
+    // Call the deferred save callback
+    deferred_save_callback(ssid, pass);
     return ESP_OK;
 }
 
