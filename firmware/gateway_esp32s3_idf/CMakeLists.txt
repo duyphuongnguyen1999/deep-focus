@@ -9,4 +9,4 @@ set(EXTRA_COMPONENT_DIRS
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
-project(esp32)
+project(gateway_esp32s3_idf)
