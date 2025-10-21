@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -117,11 +118,14 @@ static void updater_task(void *arg)
     (void)arg;
     while (1)
     {
-        float temp_c = (float)(global_temperature) / 10.0f;
-        float hum_pct = (float)(global_humidity) / 10.0f;
+        int16_t t10 = global_temperature;
+        int16_t h10 = global_humidity;
 
-        // Update UI
-        oled_display_update(temp_c, hum_pct);
+        bool valid = (t10 != INT16_MIN) && (h10 != INT16_MIN);
+        float temp_c = valid ? (float)t10 / 10.0f : NAN;
+        float hum_pct = valid ? (float)h10 / 10.0f : NAN;
+
+        oled_display_update(temp_c, hum_pct); // if NAN -> display “--.--” or similar
 
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
