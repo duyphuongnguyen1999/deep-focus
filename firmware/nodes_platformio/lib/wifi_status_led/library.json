@@ -1,0 +1,10 @@
+{
+    "name": "WiFi Status LED",
+    "version": "1.0.0",
+    "description": "A library to manage a status LED indicating WiFi connection status on ESP32 and ESP8266 devices.",
+    "build": {
+        "flags": [],
+        "includeDir": "src",
+        "srcFilter": "+<src/>"
+    }
+}
