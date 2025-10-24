@@ -1,0 +1,48 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.dbclient-js": "javascript",
+			"dht.h": "c",
+			"freertos.h": "c",
+			"esp_log.h": "c",
+			"chrono": "c",
+			"format": "c",
+			"limits": "c",
+			"functional": "c",
+			"regex": "c",
+			"tuple": "c",
+			"atomic": "c",
+			"compare": "c",
+			"cstdint": "c",
+			"dht11_reader.h": "c",
+			"_default_types.h": "c",
+			"stdint.h": "c",
+			"task.h": "c",
+			"global.h": "c",
+			"i2c_oled_display.h": "c",
+			"ssd1306.h": "c",
+			"gpio.h": "c",
+			"esp_wifi.h": "c",
+			"esp_netif_ip_addr.h": "c",
+			"uart_bridge.h": "c",
+			"esp_err.h": "c",
+			"stdbool.h": "c",
+			"err.h": "c",
+			"esp_event.h": "c",
+			"wifi_config_ap.h": "c",
+			"esp_netif.h": "c",
+			"esp_mac.h": "c",
+			"nvs_flash.h": "c",
+			"sys.h": "c",
+			"ip4_addr.h": "c",
+			"complex": "c",
+			"wifi_connect.h": "c",
+			"wifi_prov_http.h": "c"
+		}
+	}
+}
