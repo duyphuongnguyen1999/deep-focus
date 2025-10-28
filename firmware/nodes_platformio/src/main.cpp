@@ -1,8 +1,7 @@
 #include <Arduino.h>
 
 #ifdef SENSOR_NODE_ESP32
-void setupSensorNode();
-void loopSensorNode();
+#include "sensor_node_esp32.h"
 
 void setup()
 {
@@ -27,8 +26,7 @@ void loop()
 }
 
 #elif defined(IR_DUMP_ESP8266)
-void setupIrDump();
-void loopIrDump();
+#include "ir_dump_esp8266.h"
 
 void setup()
 {
