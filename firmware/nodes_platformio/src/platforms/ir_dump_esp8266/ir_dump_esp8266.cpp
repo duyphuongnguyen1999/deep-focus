@@ -1,7 +1,9 @@
 #include <Arduino.h>
-#include <assert.h>
-#include <IRremoteESP8266.h>
+#include <ArduinoJson.h>
 
+#include "ir_dump_esp8266.h"
+
+#include <IRremoteESP8266.h>
 #include <IRrecv.h>
 #include <IRutils.h>
 #include <IRac.h>
@@ -9,7 +11,7 @@
 #include <IRutils.h>
 
 const uint16_t kRecvPin = 14; // D5 (GPIO14)
-const uint32_t kBaudRate = 9600;
+const uint32_t kBaudRate = 115200;
 const uint16_t kCaptureBufferSize = 1024;
 const uint8_t kTimeout = 50; // in milliseconds
 const uint8_t kMinUnknownSize = 12;
@@ -19,16 +21,33 @@ const uint8_t kTolerancePercentage = kTolerance;
 IRrecv irrecv(kRecvPin, kCaptureBufferSize, kTimeout, true);
 decode_results results; // Somewhere to store the results
 
+enum class WaitMode
+{
+    Idle,
+    WaitingForName,
+    WaitingForIr
+};
+static WaitMode waitMode = WaitMode::WaitingForName;
+static String pendingButton;
+
+void setWaitMode(WaitMode m)
+{
+    waitMode = m;
+}
+
+void setPendingButton(const String &s)
+{
+    pendingButton = s;
+}
+
 void setupIrDump()
 {
-    Serial.begin(115200);
+    Serial.begin(kBaudRate);
     while (!Serial)
         delay(1000);
-    // Perform a low level sanity checks that the compiler performs bit field
-    // packing as we expect and Endianness is as we expect.
-    assert(irutils::lowLevelSanityCheck() == 0);
 
-    Serial.printf("\n" D_STR_IRRECVDUMP_STARTUP "\n", kRecvPin);
+    Serial.printf("\n[BOOT] IR recv on pin %u, timeout=%ums, buf=%u\n",
+                  kRecvPin, (unsigned)kTimeoutMs, (unsigned)kCaptureBufferSize);
 
 #if DECODE_HASH
     // Ignore messages with less than minimum on or off pulses.
@@ -40,30 +59,78 @@ void setupIrDump()
 
 void loopIrDump()
 {
-    // Check if the IR code has been received.
-    if (irrecv.decode(&results))
+    if (waitMode == WaitMode::WaitingForName)
     {
-        // Display a crude timestamp.
-        uint32_t now = millis();
-        Serial.printf(D_STR_TIMESTAMP " : %06u.%03u\n", now / 1000, now % 1000);
-        // Check if we got an IR message that was to big for our capture buffer.
-        if (results.overflow)
-            Serial.printf(D_WARN_BUFFERFULL "\n", kCaptureBufferSize);
-        // Display the library version the message was captured with.
-        Serial.println(D_STR_LIBRARY "   : v" _IRREMOTEESP8266_VERSION_STR "\n");
-        // Display the tolerance percentage if it has been change from the default.
-        if (kTolerancePercentage != kTolerance)
-            Serial.printf(D_STR_TOLERANCE " : %d%%\n", kTolerancePercentage);
-        // Display the basic output of what we found.
-        Serial.print(resultToHumanReadableBasic(&results));
-        // Display any extra A/C info if we have it.
-        String description = IRAcUtils::resultAcToString(&results);
-        if (description.length())
-            Serial.println(D_STR_MESGDESC ": " + description);
-        yield(); // Feed the WDT as the text output can take a while to print.
-        // Output the results as source code
-        Serial.println(resultToSourceCode(&results));
-        Serial.println(); // Blank line between entries
-        yield();          // Feed the WDT (again)
+        if (Serial.available())
+        {
+            String s = Serial.readStringUntil('\n');
+            s.trim();
+            if (s.length() > 0)
+            {
+                pendingButton = s;
+                Serial.printf("[INFO] Ready to receive IR code for button name: '%s'\n", pendingButton.c_str());
+                waitMode = WaitMode::WaitingForIr;
+            }
+            else
+            {
+                Serial.printf("[INFO] Please enter a button name.\n");
+            }
+        }
+        return;
+    }
+    if (waitMode == WaitMode::WaitingForIr)
+    {
+        // Check if the IR code has been received.
+        if (irrecv.decode(&results))
+        {
+            String valueHex;
+            if (results.decode_type != decode_type_t::UNKNOWN)
+            {
+                char buf[22];
+                snprintf(buf, sizeof(buf), "0x%llX", (unsigned long long)results.value);
+                valueHex = String(buf);
+            }
+
+            JsonDocument doc;
+            doc["btn"] = pendingButton;
+            doc["ts_ms"] = millis();
+            doc["protocol"] = typeToString(results.decode_type, false);
+            doc["bits"] = results.bits;
+
+            if (results.decode_type != decode_type_t::UNKNOWN)
+            {
+                char buf[22];
+                snprintf(buf, sizeof(buf), "0x%llX", (unsigned long long)results.value);
+                doc["value"] = buf;
+            }
+
+            JsonArray raw = doc["raw_us"].to<JsonArray>();
+
+            for (uint16_t i = 0; i < results.rawlen; i++)
+            {
+                raw.add((uint32_t)results.rawbuf[i] * kRawTick);
+            }
+
+            // In JSON
+            serializeJson(doc, Serial);
+            Serial.println();
+
+            // // Display the basic output of what we found.
+            // Serial.print(resultToHumanReadableBasic(&results));
+            // // Display any extra A/C info if we have it.
+            // String description = IRAcUtils::resultAcToString(&results);
+            // if (description.length())
+            //     Serial.println(D_STR_MESGDESC ": " + description);
+            // yield(); // Feed the WDT as the text output can take a while to print.
+            // // Output the results as source code
+            // Serial.println(resultToSourceCode(&results));
+            // Serial.println(); // Blank line between entries
+            // yield();          // Feed the WDT (again)
+
+            irrecv.resume();
+            waitMode = WaitMode::WaitingForName;
+            pendingButton = "";
+            Serial.printf("[INFO] Please enter a button name.\n");
+        }
     }
 }
