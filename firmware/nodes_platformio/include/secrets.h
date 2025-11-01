@@ -1,10 +1,14 @@
 #pragma once
 #include <Arduino.h>
+#define BLYNK_TEMPLATE_ID "TMPL6kkzXdQiV"
+#define BLYNK_TEMPLATE_NAME "DeepFocus"
 
-// MAC address of the ESP32-S3 Gateway
-static const uint8_t ESP32_S3_GATEWAY_MAC[6] = {0x24, 0x6F, 0x28, 0xAB, 0xCD, 0xEF};
+#if defined(SENSOR_NODE_ESP8266)
+#define BLYNK_AUTH_TOKEN "rsHF2X8Kd-cU9WzIddqAvRVXia8wBDCi"
+#elif defined(CONTROLLER_NODE_ESP32)
+#define BLYNK_AUTH_TOKEN "iwi6t1h1RLwbJcLhtKBrTvR0-o3hAqOu"
+#endif
 
 // WiFi Credentials
-static const char *GATEWAY_SSID = "YourWiFiSSID";
-static const char *GATEWAY_PASSWORD = "YourWiFiPassword";
-static const unint8_t WIFI_CHANNEL = 1;
+const char ssid[] = "Duy Phuong (tang 3)";
+const char pass[] = "Phuong1234";
