@@ -122,5 +122,5 @@ float AnalogReader::readNormalized(float upper, float lower)
 float AnalogReader::readVoltage(float vref)
 {
     const uint16_t adc = AnalogReader::readRaw();
-    return (static_cast<float>(adc) * vref) / 4095.0f;
+    return (static_cast<float>(adc) * vref) / static_cast<float>(kDefaultMaxAnalogValue);
 }

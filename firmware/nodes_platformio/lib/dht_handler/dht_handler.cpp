@@ -2,124 +2,107 @@
 #include <Adafruit_Sensor.h>
 
 DHT_Handler::DHT_Handler(uint8_t pin, uint8_t type)
-    : _pin(pin), _type(type), _dht(pin, type)
-{
-}
+    : _pin(pin), _type(type), _dht(pin, type) {}
 
 void DHT_Handler::begin()
 {
     _dht.begin();
     _initialized = true;
+
     sensor_t t_sensor, h_sensor;
     _dht.temperature().getSensor(&t_sensor);
     _dht.humidity().getSensor(&h_sensor);
+
     _minDelayUs = (t_sensor.min_delay > h_sensor.min_delay) ? t_sensor.min_delay : h_sensor.min_delay;
-    delayUs = _minDelayUs;
+
+    // đảm bảo delayUs không nhỏ hơn min của cảm biến
+    if (delayUs < _minDelayUs)
+        delayUs = _minDelayUs;
+
+    _lastReadUs = 0;
+    _lastValid = false;
+    _lastTemp = NAN;
+    _lastHum = NAN;
 }
 
-uint32_t DHT_Handler::getDelayUs()
-{
-    return delayUs;
-}
+uint32_t DHT_Handler::getDelayUs() { return delayUs; }
 
 void DHT_Handler::setDelayUs(uint32_t duration)
 {
-    delayUs = duration;
+    // ép không được nhỏ hơn minDelay của sensor
+    delayUs = (duration < _minDelayUs) ? _minDelayUs : duration;
 }
 
-void DHT_Handler::dhtSensorInfo()
+bool DHT_Handler::pollIfDue_()
 {
-    // Initialize device.
     if (!_initialized)
-    {
-        Serial.println("DHT not initialized. Call begin() first.");
-        return;
-    }
-    // Print temperature sensor details.
-    sensor_t sensor;
-    _dht.temperature().getSensor(&sensor);
-    Serial.println(F("------------------------------------"));
-    Serial.println(F("Temperature Sensor"));
-    Serial.print(F("Sensor Type: "));
-    Serial.println(sensor.name);
-    Serial.print(F("Driver Ver:  "));
-    Serial.println(sensor.version);
-    Serial.print(F("Unique ID:   "));
-    Serial.println(sensor.sensor_id);
-    Serial.print(F("Max Value:   "));
-    Serial.print(sensor.max_value);
-    Serial.println(F("°C"));
-    Serial.print(F("Min Value:   "));
-    Serial.print(sensor.min_value);
-    Serial.println(F("°C"));
-    Serial.print(F("Resolution:  "));
-    Serial.print(sensor.resolution);
-    Serial.println(F("°C"));
-    Serial.println(F("------------------------------------"));
+        return false;
 
-    // Print humidity sensor details.
-    _dht.humidity().getSensor(&sensor);
-    Serial.println(F("Humidity Sensor"));
-    Serial.print(F("Sensor Type: "));
-    Serial.println(sensor.name);
-    Serial.print(F("Driver Ver:  "));
-    Serial.println(sensor.version);
-    Serial.print(F("Unique ID:   "));
-    Serial.println(sensor.sensor_id);
-    Serial.print(F("Max Value:   "));
-    Serial.print(sensor.max_value);
-    Serial.println(F("%"));
-    Serial.print(F("Min Value:   "));
-    Serial.print(sensor.min_value);
-    Serial.println(F("%"));
-    Serial.print(F("Resolution:  "));
-    Serial.print(sensor.resolution);
-    Serial.println(F("%"));
-    Serial.println(F("------------------------------------"));
+    const uint32_t now = micros();
+    if (now - _lastReadUs < delayUs)
+    {
+        return false; // chưa đến kỳ, không đụng cache
+    }
+
+    _lastReadUs = now;
+
+    sensors_event_t t_event, h_event;
+    _dht.temperature().getEvent(&t_event);
+    _dht.humidity().getEvent(&h_event);
+
+    if (!isnan(t_event.temperature) && !isnan(h_event.relative_humidity))
+    {
+        _lastTemp = t_event.temperature;
+        _lastHum = h_event.relative_humidity;
+        _lastValid = true;
+        return true; // VỪA có mẫu MỚI
+    }
+
+    // Lỗi: giữ cache cũ, báo không có mẫu MỚI
+    return false;
 }
+
+// ===== API =====
+
+// Ba hàm dưới đây CHỈ trả true khi có MẪU MỚI (đúng chu kỳ).
+// Nếu bạn muốn lấy lại giá trị gần nhất dù chưa tới kỳ, dùng getLastTemperature()/getLastHumidity().
 
 bool DHT_Handler::readTemperature(float &out_temp)
 {
     if (!_initialized)
-    {
         return false;
-    }
-
-    sensors_event_t event;
-
-    _dht.temperature().getEvent(&event);
-    if (isnan(event.temperature))
-    {
+    const bool newSample = pollIfDue_();
+    if (!newSample)
+        return false; // chỉ báo khi vừa đọc mới
+    if (!_lastValid || isnan(_lastTemp))
         return false;
-    }
-
-    out_temp = event.temperature;
-
-    delayMicroseconds(delayUs);
-    Serial.print("Temperature: ");
-    Serial.println(out_temp);
+    out_temp = _lastTemp;
     return true;
 }
 
 bool DHT_Handler::readHumidity(float &out_hum)
 {
     if (!_initialized)
-    {
         return false;
-    }
-
-    sensors_event_t event;
-
-    _dht.humidity().getEvent(&event);
-    if (isnan(event.relative_humidity))
-    {
+    const bool newSample = pollIfDue_();
+    if (!newSample)
+        return false; // chỉ báo khi vừa đọc mới
+    if (!_lastValid || isnan(_lastHum))
         return false;
-    }
+    out_hum = _lastHum;
+    return true;
+}
 
-    out_hum = event.relative_humidity;
-
-    delayMicroseconds(delayUs);
-    Serial.print("Humidity: ");
-    Serial.println(out_hum);
+bool DHT_Handler::readTemperatureAndHumidity(float &out_temp, float &out_hum)
+{
+    if (!_initialized)
+        return false;
+    const bool newSample = pollIfDue_();
+    if (!newSample)
+        return false; // chỉ báo khi vừa đọc mới
+    if (!_lastValid || isnan(_lastTemp) || isnan(_lastHum))
+        return false;
+    out_temp = _lastTemp;
+    out_hum = _lastHum;
     return true;
 }

@@ -14,7 +14,16 @@ public:
     };
     // Default config
     static constexpr uint16_t kDefaultMinAnalogValue = 0;
+#ifdef ESP32
     static constexpr uint16_t kDefaultMaxAnalogValue = 4095;
+    static constexpr float kDefaultVref = 3.3f;
+#elif defined(ESP8266)
+    static constexpr uint16_t kDefaultMaxAnalogValue = 1023;
+    static constexpr float kDefaultVref = 1.0f;
+#elif defined(ESP8266_NODE_MCU)
+    static constexpr uint16_t kDefaultMaxAnalogValue = 1023;
+    static constexpr float kDefaultVref = 3.3f;
+#endif
     static constexpr FilterMethod kDefaultFilterMethod = FilterMethod::SMA;
     static constexpr uint32_t kDefaultPeriodUs = 200000; // 200ms
     static constexpr uint8_t kDefaultWindowSize = 10;
@@ -38,7 +47,7 @@ public:
     uint16_t readSmoothed();
     float readNormalized(); // Min-Max Normalizer
     float readNormalized(float upper, float lower);
-    float readVoltage(float vref = 5.0f);
+    float readVoltage(float vref = 3.3f);
 
 private:
     uint8_t _pin;
@@ -48,7 +57,11 @@ private:
     float _smoothingFactor;
     uint32_t _periodUs, _lastReadUs = 0;
     uint16_t _lastReadValue = 0;
+#ifdef ESP32
     uint16_t _runMin = 4095;
+#elif defined(ESP8266) || defined(ESP8266_NODE_MCU)
+    uint16_t _runMin = 1023;
+#endif
     uint16_t _runMax = 0;
     bool _autoCal = false;
 
